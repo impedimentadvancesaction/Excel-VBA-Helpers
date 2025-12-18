@@ -1,298 +1,122 @@
 Option Explicit
 
-' ===== Controller =====
-Public Sub Run_All_CRQ_Reports()
-    Dim ts As TemplateSnapshot
-    Dim crqs As Collection, crq As Variant
-    Dim appState As AppState
-    Dim wbPath As String
+Public Sub GenerateReports()
+    Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet, ws4 As Worksheet
+    Dim lastRow1 As Long, lastRow2 As Long, lastRow4 As Long
+    Dim dictCRQ As Object, dictLookup As Object
+    Dim r As Long, crq As Variant, rgID As Variant
+    Dim outRow As Long, d As Date
     
-    wbPath = ThisWorkbook.Path
-    Set appState = SetAppPerformance(True)
-    Set ts = SnapshotTemplates("Reg Form 1", "Reg Form 2")
-    Set crqs = GetUniqueValues(ThisWorkbook.Worksheets("Working"), 3) ' Col C: CRQ
+    Set ws1 = Worksheets("Working")
+    Set ws2 = Worksheets("GCA Export")
+    Set ws3 = Worksheets("Reg Form 1")
+    Set ws4 = Worksheets("Reg Form 2")
     
-    Application.StatusBar = "Starting report generation for " & crqs.Count & " CRQs..."
-    
-    Dim i As Long
-    For i = 1 To crqs.Count
-        crq = crqs(i)
-        Application.StatusBar = "Processing CRQ: " & crq & " (" & i & " of " & crqs.Count & ")"
-        Debug.Print ">>> Starting CRQ: " & crq
-        
-        BuildTab4ForCRQ crq, _
-            wsSource:=Worksheets("Working"), _
-            wsLookup:=Worksheets("GCA Export"), _
-            wsOut:=Worksheets("Reg Form 2")
-        
-        FillTab3ForCRQ crq, _
-            wsTab3:=Worksheets("Reg Form 1"), _
-            wsTab4:=Worksheets("Reg Form 2"), _
-            wsSource:=Worksheets("Working")
-        
-        ExportSheetAsWorkbook Worksheets("Reg Form 2"), _
-            BuildGIFFileName(Worksheets("Reg Form 2")), wbPath
-        
-        ExportSheetAsWorkbook Worksheets("Reg Form 1"), _
-            Worksheets("Reg Form 1").Range("A1").Value, wbPath
-        
-        Debug.Print ">>> Exported reports for CRQ: " & crq
-        Application.StatusBar = "Exported reports for CRQ " & crq & " (" & i & " of " & crqs.Count & ")"
-        
-        RestoreTemplates ts, Worksheets("Reg Form 1"), Worksheets("Reg Form 2")
-    Next i
-    
-    Application.StatusBar = "Completed " & crqs.Count & " CRQs."
-    Debug.Print ">>> All reports complete."
-    SetAppPerformance False, appState
-End Sub
-
-' ===== Performance toggles =====
-Private Type AppState
-    ScreenUpdating As Boolean
-    EnableEvents As Boolean
-    Calculation As XlCalculation
-    DisplayAlerts As Boolean
-End Type
-
-Private Function SetAppPerformance(ByVal start As Boolean, Optional ByVal stateIn As AppState) As AppState
-    Dim st As AppState
-    If start Then
-        st.ScreenUpdating = Application.ScreenUpdating
-        st.EnableEvents = Application.EnableEvents
-        st.Calculation = Application.Calculation
-        st.DisplayAlerts = Application.DisplayAlerts
-        
-        Application.ScreenUpdating = False
-        Application.EnableEvents = False
-        Application.Calculation = xlCalculationManual
-        Application.DisplayAlerts = False
-        Set SetAppPerformance = st
-    Else
-        Application.ScreenUpdating = stateIn.ScreenUpdating
-        Application.EnableEvents = stateIn.EnableEvents
-        Application.Calculation = stateIn.Calculation
-        Application.DisplayAlerts = stateIn.DisplayAlerts
-    End If
-End Function
-
-' ===== Template snapshot/restore =====
-Private Type TemplateSnapshot
-    Tab3Used As Variant
-    Tab4Used As Variant
-    Tab3Addr As String
-    Tab4Addr As String
-    Tab3FontColor As Long
-    Tab4FontColor As Long
-End Type
-
-Private Function SnapshotTemplates(tab3Name As String, tab4Name As String) As TemplateSnapshot
-    Dim ts As TemplateSnapshot
-    With Worksheets(tab3Name).UsedRange
-        ts.Tab3Used = .Value
-        ts.Tab3Addr = .Address
-        ts.Tab3FontColor = .Font.Color
-    End With
-    With Worksheets(tab4Name).UsedRange
-        ts.Tab4Used = .Value
-        ts.Tab4Addr = .Address
-        ts.Tab4FontColor = .Font.Color
-    End With
-    SnapshotTemplates = ts
-End Function
-
-Private Sub RestoreTemplates(ts As TemplateSnapshot, wsTab3 As Worksheet, wsTab4 As Worksheet)
-    wsTab3.Range(ts.Tab3Addr).Value = ts.Tab3Used
-    wsTab4.Range(ts.Tab4Addr).Value = ts.Tab4Used
-    wsTab3.UsedRange.Font.Color = ts.Tab3FontColor
-    wsTab4.UsedRange.Font.Color = ts.Tab4FontColor
-End Sub
-
-' ===== Unique values from a column =====
-Private Function GetUniqueValues(ws As Worksheet, colIndex As Long) As Collection
-    Dim dict As Object, lastRow As Long, r As Long, v
-    Set dict = CreateObject("Scripting.Dictionary")
-    lastRow = ws.Cells(ws.Rows.Count, colIndex).End(xlUp).Row
-    For r = 2 To lastRow
-        v = Trim$(ws.Cells(r, colIndex).Value)
-        If Len(v) > 0 Then If Not dict.Exists(v) Then dict.Add v, 1
-    Next
-    Dim c As New Collection, k
-    For Each k In dict.Keys: c.Add k: Next
-    Set GetUniqueValues = c
-End Function
-
-' ===== Lookup Tab 2 headers by name =====
-Private Function HeaderMap(ws As Worksheet) As Object
-    Dim dict As Object, lastCol As Long, c As Long
-    Set dict = CreateObject("Scripting.Dictionary")
-    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
-    For c = 1 To lastCol
-        dict(Trim$(ws.Cells(1, c).Value)) = c
-    Next
-    Set HeaderMap = dict
-End Function
-
-' ===== Build Tab 4 for one CRQ =====
-Private Sub BuildTab4ForCRQ(ByVal crq As String, _
-    ByVal wsSource As Worksheet, ByVal wsLookup As Worksheet, ByVal wsOut As Worksheet)
-    
-    Dim lastRowSrc As Long, r As Long
-    Dim ids As Collection, idVal
-    Set ids = New Collection
-    
-    lastRowSrc = wsSource.Cells(wsSource.Rows.Count, 3).End(xlUp).Row ' Col C: CRQ
-    For r = 2 To lastRowSrc
-        If Trim$(wsSource.Cells(r, 3).Value) = crq Then
-            idVal = wsSource.Cells(r, 4).Value ' Col D: Reg Game ID
-            If Len(idVal) > 0 Then ids.Add idVal
-        End If
-    Next
-    
-    Dim h As Object: Set h = HeaderMap(wsLookup)
-    Dim rowOut As Long: rowOut = 3
-    
-    Dim regCol As Long: regCol = h("RegulatedGameID")
-    Dim lastRowLkp As Long: lastRowLkp = wsLookup.Cells(wsLookup.Rows.Count, regCol).End(xlUp).Row
-    
-    Dim dictRowByID As Object: Set dictRowByID = CreateObject("Scripting.Dictionary")
-    Dim key As Variant
-    For r = 2 To lastRowLkp
-        key = Trim$(wsLookup.Cells(r, regCol).Value)
-        If Len(key) > 0 Then If Not dictRowByID.Exists(key) Then dictRowByID.Add key, r
-    Next
-    
-    Dim k As Variant, rr As Long
-    For Each k In ids
-        If dictRowByID.Exists(CStr(k)) Then
-            rr = dictRowByID(CStr(k))
-            wsOut.Cells(rowOut, 1).Value = crq
-            wsOut.Cells(rowOut, 2).Value = wsLookup.Cells(rr, h("GameName")).Value
-            wsOut.Cells(rowOut, 6).Value = wsLookup.Cells(rr, h("Delivery Channel")).Value
-            wsOut.Cells(rowOut, 4).Value = wsLookup.Cells(rr, h("PlatformOwner")).Value
-            wsOut.Cells(rowOut, 3).Value = wsLookup.Cells(rr, h("GamesCertificateReference")).Value
-            wsOut.Cells(rowOut, 7).Value = wsLookup.Cells(rr, h("GameVersion")).Value
-            wsOut.Cells(rowOut, 8).Value = wsLookup.Cells(rr, h("TheoreticalRTP")).Value
-            wsOut.Cells(rowOut, 9).Value = IIf(CBoolValue(wsLookup.Cells(rr, h("isProgrssive")).Value), "Y", "N")
-            wsOut.Cells(rowOut, 10).Value = IIf(LCase$(Trim$(wsLookup.Cells(rr, h("GameType")).Value)) = "slots", "Y", "N")
-            rowOut = rowOut + 1
-        End If
-    Next
-    
-    If rowOut > 3 Then
-        Dim d As Date: d = NextBusinessDay(Date)
-        wsOut.Range("K3:K" & rowOut - 1).Value = Format$(d, "dd/mm/yyyy")
-    End If
-    
-    ApplyBlackFontAndBorders wsOut
-End Sub
-
-' ===== Fill Tab 3 using Tab 4 and rules =====
-Private Sub FillTab3ForCRQ(ByVal crq As String, _
-    ByVal wsTab3 As Worksheet, ByVal wsTab4 As Worksheet, ByVal wsSource As Worksheet)
-    
-    Dim lastRow4 As Long: lastRow4 = wsTab4.Cells(wsTab4.Rows.Count, 2).End(xlUp).Row ' Col B: GameName
-    Dim uniqNames As Object: Set uniqNames = CreateObject("Scripting.Dictionary")
-    Dim r As Long
-    For r = 3 To lastRow4
-        If Len(Trim$(wsTab4.Cells(r, 2).Value)) > 0 Then
-            uniqNames(Trim$(wsTab4.Cells(r, 2).Value)) = 1
-        End If
-    Next
-    
-    Dim platformOwner As String, crqFromTab4 As String
-    platformOwner = wsTab4.Cells(3, 4).Value  ' Col D
-    crqFromTab4 = wsTab4.Cells(3, 1).Value    ' Col A
-    
-    If uniqNames.Count = 1 And lastRow4 >= 3 Then
-        Dim gameName As String
-        gameName = wsTab4.Cells(3, 2).Value   ' Col B
-        wsTab3.Range("A1").Value = "Activate " & platformOwner & " game " & gameName & _
-                                  " on Desktop & Mobile (" & crqFromTab4 & ")"
-        wsTab3.Range("A4").Value = wsTab3.Range("A1").Value & vbCrLf & "New Content"
-    ElseIf uniqNames.Count > 1 Then
-        wsTab3.Range("A1").Value = "Activate multiple " & platformOwner & _
-                                  " games on Desktop & Mobile (" & crqFromTab4 & ")"
-        wsTab3.Range("A4").Value = wsTab3.Range("A1").Value & vbCrLf & "New Content"
-    End If
-    
-    ' A16 = same date as Tab 4 K3 but as "MONTH DD, YYYY - 1 Hour"
-    If Len(wsTab4.Range("K3").Value) > 0 Then
-        wsTab3.Range("A16").Value = Format$(CDate(wsTab4.Range("K3").Value), "MMMM dd, yyyy") & " - 1 Hour"
-    End If
-    
-    ' Tab 1 A19 mapping: find row in Tab 1 where CRQ matches Tab 4 A3, then take column B
-    Dim ws1 As Worksheet: Set ws1 = wsSource
-    Dim lastRow1 As Long: lastRow1 = ws1.Cells(ws1.Rows.Count, 3).End(xlUp).Row
+    ' Collect unique CRQs
+    Set dictCRQ = CreateObject("Scripting.Dictionary")
+    lastRow1 = ws1.Cells(ws1.Rows.Count, 3).End(xlUp).Row
     For r = 2 To lastRow1
-        If Trim$(ws1.Cells(r, 3).Value) = Trim$(wsTab4.Cells(3, 1).Value) Then
-            ws1.Range("A19").Value = ws1.Cells(r, 2).Value
-            Exit For
-        End If
+        crq = Trim(ws1.Cells(r, 3).Value)
+        If Len(crq) > 0 Then If Not dictCRQ.Exists(crq) Then dictCRQ.Add crq, 1
     Next
     
-    wsTab3.Range("A28").Value = "See Games Installation Form " & wsTab4.Cells(3, 1).Value
-    wsTab3.Range("A34").Value = "See Games Installation Form " & wsTab4.Cells(3, 1).Value
+    ' Build lookup dictionary from Tab 2
+    Set dictLookup = CreateObject("Scripting.Dictionary")
+    lastRow2 = ws2.Cells(ws2.Rows.Count, 1).End(xlUp).Row
+    For r = 2 To lastRow2
+        dictLookup(Trim(ws2.Cells(r, ws2.Rows(1).Find("RegulatedGameID").Column).Value)) = r
+    Next
     
-    ApplyBlackFont wsTab3
+    ' Loop through each CRQ
+    Dim key As Variant
+    For Each key In dictCRQ.Keys
+        crq = key
+        outRow = 3
+        ws4.Rows("3:" & ws4.Rows.Count).ClearContents
+        
+        ' Collect Reg Game IDs for this CRQ
+        For r = 2 To lastRow1
+            If Trim(ws1.Cells(r, 3).Value) = crq Then
+                rgID = ws1.Cells(r, 4).Value
+                If dictLookup.Exists(CStr(rgID)) Then
+                    Dim rr As Long: rr = dictLookup(CStr(rgID))
+                    ws4.Cells(outRow, 1).Value = crq
+                    ws4.Cells(outRow, 2).Value = ws2.Cells(rr, ws2.Rows(1).Find("GameName").Column).Value
+                    ws4.Cells(outRow, 3).Value = ws2.Cells(rr, ws2.Rows(1).Find("GamesCertificateReference").Column).Value
+                    ws4.Cells(outRow, 4).Value = ws2.Cells(rr, ws2.Rows(1).Find("PlatformOwner").Column).Value
+                    ws4.Cells(outRow, 6).Value = ws2.Cells(rr, ws2.Rows(1).Find("Delivery Channel").Column).Value
+                    ws4.Cells(outRow, 7).Value = ws2.Cells(rr, ws2.Rows(1).Find("GameVersion").Column).Value
+                    ws4.Cells(outRow, 8).Value = ws2.Cells(rr, ws2.Rows(1).Find("TheoreticalRTP").Column).Value
+                    ws4.Cells(outRow, 9).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("isProgrssive").Column).Value)) = "true", "Y", "N")
+                    ws4.Cells(outRow, 10).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("GameType").Column).Value)) = "slots", "Y", "N")
+                    outRow = outRow + 1
+                End If
+            End If
+        Next
+        
+        ' Date in Column K
+        If outRow > 3 Then
+            d = Date + 1
+            If Weekday(d, vbMonday) = 6 Then d = d + 2
+            ws4.Range("K3:K" & outRow - 1).Value = Format(d, "dd/mm/yyyy")
+        End If
+        
+        ' Format Tab 4
+        With ws4.UsedRange
+            .Font.Color = vbBlack
+            .Borders.LineStyle = xlContinuous
+        End With
+        
+        ' Tab 3 setup
+        ws3.Cells.ClearContents
+        Dim uniqNames As Object: Set uniqNames = CreateObject("Scripting.Dictionary")
+        lastRow4 = ws4.Cells(ws4.Rows.Count, 2).End(xlUp).Row
+        For r = 3 To lastRow4
+            If Len(Trim(ws4.Cells(r, 2).Value)) > 0 Then uniqNames(Trim(ws4.Cells(r, 2).Value)) = 1
+        Next
+        
+        Dim platformOwner As String: platformOwner = ws4.Cells(3, 4).Value
+        If uniqNames.Count = 1 Then
+            ws3.Range("A1").Value = "Activate " & platformOwner & " game " & ws4.Cells(3, 2).Value & " on Desktop & Mobile (" & crq & ")"
+        ElseIf uniqNames.Count > 1 Then
+            ws3.Range("A1").Value = "Activate multiple " & platformOwner & " games on Desktop & Mobile (" & crq & ")"
+        End If
+        ws3.Range("A4").Value = ws3.Range("A1").Value & vbCrLf & "New Content"
+        ws3.Range("A16").Value = Format(CDate(ws4.Range("K3").Value), "MMMM dd, yyyy") & " - 1 Hour"
+        
+        ' A19 from Tab 1 col B
+        For r = 2 To lastRow1
+            If ws1.Cells(r, 3).Value = crq Then
+                ws3.Range("A19").Value = ws1.Cells(r, 2).Value
+                Exit For
+            End If
+        Next
+        ws3.Range("A28").Value = "See Games Installation Form " & crq
+        ws3.Range("A34").Value = "See Games Installation Form " & crq
+        ws3.UsedRange.Font.Color = vbBlack
+        
+        ' Export Tab 4
+        ExportSheet ws4, "Game Installation Form " & crq
+        ' Export Tab 3
+        ExportSheet ws3, ws3.Range("A1").Value
+    Next
 End Sub
 
-' ===== Utilities =====
-Private Function CBoolValue(v As Variant) As Boolean
-    Dim s As String: s = LCase$(Trim$(CStr(v)))
-    CBoolValue = (s = "true" Or s = "yes" Or s = "y" Or s = "1")
-End Function
-
-Private Function NextBusinessDay(d As Date) As Date
-    Dim nd As Date: nd = d + 1
-    If Weekday(nd, vbMonday) = 6 Then nd = nd + 2 ' Saturday -> Monday
-    NextBusinessDay = nd
-End Function
-
-Private Sub ApplyBlackFontAndBorders(ws As Worksheet)
-    With ws.UsedRange
-        .Font.Color = vbBlack
-        .Borders.LineStyle = xlContinuous
-    End With
-End Sub
-
-Private Sub ApplyBlackFont(ws As Worksheet)
-    ws.UsedRange.Font.Color = vbBlack
-End Sub
-
-' ===== Export helpers =====
-Private Function BuildGIFFileName(wsTab4 As Worksheet) As String
-    BuildGIFFileName = "Game Installation Form " & wsTab4.Range("A3").Value
-End Function
-
-Private Sub ExportSheetAsWorkbook(ws As Worksheet, baseName As String, folderPath As String)
-    Dim fn As String: fn = SanitizeFileName(baseName)
-    fn = EnsureUniqueFileName(folderPath, fn & ".xlsx")
-    
+Private Sub ExportSheet(ws As Worksheet, baseName As String)
+    Dim fn As String
+    fn = SanitizeFileName(baseName) & ".xlsx"
     Dim newWb As Workbook
     ws.Copy
     Set newWb = ActiveWorkbook
-    newWb.SaveAs Filename:=folderPath & "\" & fn, FileFormat:=xlOpenXMLWorkbook
-    newWb.Close SaveChanges:=False
+    newWb.SaveAs ThisWorkbook.Path & "\" & fn, xlOpenXMLWorkbook
+    newWb.Close False
 End Sub
 
 Private Function SanitizeFileName(s As String) As String
     Dim badChars As Variant, i As Long
     badChars = Array(":", "\", "/", "?", "*", "[", "]", """")
     For i = LBound(badChars) To UBound(badChars)
-        s = Replace$(s, badChars(i), "-")
+        s = Replace(s, badChars(i), "-")
     Next
-    SanitizeFileName = Trim$(s)
-End Function
-
-Private Function EnsureUniqueFileName(folderPath As String, fileName As String) As String
-    Dim base As String, ext As String, idx As Long, candidate As String
-    base = Left$(fileName, InStrRev(fileName, ".") - 1)
-    ext = Mid$(fileName, InStrRev(fileName, "."))
-    candidate = fileName
-    Do While Dir$(folderPath & "\" & candidate) <> ""
-        idx = idx + 1
-        candidate = base & " (" & idx & ")" & ext
-    Loop
-    EnsureUniqueFileName = candidate
+    SanitizeFileName = Trim(s)
 End Function
