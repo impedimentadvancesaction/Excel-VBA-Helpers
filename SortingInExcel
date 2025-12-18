@@ -2,17 +2,20 @@ Option Explicit
 
 Public Sub GenerateReports()
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet, ws4 As Worksheet
-    Dim lastRow1 As Long, lastRow2 As Long, lastRow4 As Long
     Dim dictCRQ As Object, dictLookup As Object
-    Dim r As Long, crq As Variant, rgID As Variant
-    Dim outRow As Long, d As Date
+    Dim lastRow1 As Long, lastRow2 As Long, r As Long, crq As Variant
     
     Set ws1 = Worksheets("Working")
     Set ws2 = Worksheets("GCA Export")
     Set ws3 = Worksheets("Reg Form 1")
     Set ws4 = Worksheets("Reg Form 2")
     
-    ' Collect unique CRQs from Tab 1 column C
+    ' Snapshot templates
+    Dim tpl3 As Variant, tpl4 As Variant
+    tpl3 = ws3.UsedRange.Value
+    tpl4 = ws4.UsedRange.Value
+    
+    ' Collect unique CRQs
     Set dictCRQ = CreateObject("Scripting.Dictionary")
     lastRow1 = ws1.Cells(ws1.Rows.Count, 3).End(xlUp).Row
     For r = 2 To lastRow1
@@ -33,16 +36,14 @@ Public Sub GenerateReports()
     For Each key In dictCRQ.Keys
         crq = key
         
-        ' Find next available row in Tab 4 (start at row 3 if empty)
-        outRow = ws4.Cells(ws4.Rows.Count, 1).End(xlUp).Row + 1
-        If outRow < 3 Then outRow = 3
-        
-        ' Collect Reg Game IDs for this CRQ
+        ' --- Populate Tab 4 ---
+        Dim outRow As Long: outRow = 3
+        Dim rgID As Variant, rr As Long
         For r = 2 To lastRow1
             If Trim(ws1.Cells(r, 3).Value) = crq Then
                 rgID = ws1.Cells(r, 4).Value
                 If dictLookup.Exists(CStr(rgID)) Then
-                    Dim rr As Long: rr = dictLookup(CStr(rgID))
+                    rr = dictLookup(CStr(rgID))
                     ws4.Cells(outRow, 1).Value = crq
                     ws4.Cells(outRow, 2).Value = ws2.Cells(rr, ws2.Rows(1).Find("GameName").Column).Value
                     ws4.Cells(outRow, 3).Value = ws2.Cells(rr, ws2.Rows(1).Find("GamesCertificateReference").Column).Value
@@ -52,21 +53,15 @@ Public Sub GenerateReports()
                     ws4.Cells(outRow, 8).Value = ws2.Cells(rr, ws2.Rows(1).Find("TheoreticalRTP").Column).Value
                     ws4.Cells(outRow, 9).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("isProgrssive").Column).Value)) = "true", "Y", "N")
                     ws4.Cells(outRow, 10).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("GameType").Column).Value)) = "slots", "Y", "N")
-                    ws4.Cells(outRow, 11).Value = Format(NextBusinessDay(Date), "dd/mm/yyyy") ' Column K
+                    ws4.Cells(outRow, 11).Value = Format(NextBusinessDay(Date), "dd/mm/yyyy")
                     outRow = outRow + 1
                 End If
             End If
         Next
         
-        ' Format Tab 4 cells we just wrote
-        With ws4.Range("A3:K" & outRow - 1)
-            .Font.Color = vbBlack
-            .Borders.LineStyle = xlContinuous
-        End With
-        
-        ' Tab 3 setup (only target cells, template preserved)
+        ' --- Populate Tab 3 ---
         Dim uniqNames As Object: Set uniqNames = CreateObject("Scripting.Dictionary")
-        lastRow4 = ws4.Cells(ws4.Rows.Count, 2).End(xlUp).Row
+        Dim lastRow4 As Long: lastRow4 = ws4.Cells(ws4.Rows.Count, 2).End(xlUp).Row
         For r = 3 To lastRow4
             If Len(Trim(ws4.Cells(r, 2).Value)) > 0 Then uniqNames(Trim(ws4.Cells(r, 2).Value)) = 1
         Next
@@ -80,7 +75,6 @@ Public Sub GenerateReports()
         ws3.Range("A4").Value = ws3.Range("A1").Value & vbCrLf & "New Content"
         ws3.Range("A16").Value = Format(CDate(ws4.Range("K3").Value), "MMMM dd, yyyy") & " - 1 Hour"
         
-        ' A19 from Tab 1 col B
         For r = 2 To lastRow1
             If ws1.Cells(r, 3).Value = crq Then
                 ws3.Range("A19").Value = ws1.Cells(r, 2).Value
@@ -89,18 +83,20 @@ Public Sub GenerateReports()
         Next
         ws3.Range("A28").Value = "See Games Installation Form " & crq
         ws3.Range("A34").Value = "See Games Installation Form " & crq
-        ws3.Range("A1:A34").Font.Color = vbBlack
         
-        ' Export Tab 4
+        ' --- Export ---
         ExportSheet ws4, "Game Installation Form " & crq
-        ' Export Tab 3
         ExportSheet ws3, ws3.Range("A1").Value
+        
+        ' --- Restore templates ---
+        ws3.UsedRange.Value = tpl3
+        ws4.UsedRange.Value = tpl4
     Next
 End Sub
 
 Private Function NextBusinessDay(d As Date) As Date
     Dim nd As Date: nd = d + 1
-    If Weekday(nd, vbMonday) = 6 Then nd = nd + 2 ' Saturday → Monday
+    If Weekday(nd, vbMonday) = 6 Then nd = nd + 2
     NextBusinessDay = nd
 End Function
 
