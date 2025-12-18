@@ -12,7 +12,7 @@ Public Sub GenerateReports()
     Set ws3 = Worksheets("Reg Form 1")
     Set ws4 = Worksheets("Reg Form 2")
     
-    ' Collect unique CRQs
+    ' Collect unique CRQs from Tab 1 column C
     Set dictCRQ = CreateObject("Scripting.Dictionary")
     lastRow1 = ws1.Cells(ws1.Rows.Count, 3).End(xlUp).Row
     For r = 2 To lastRow1
@@ -23,16 +23,19 @@ Public Sub GenerateReports()
     ' Build lookup dictionary from Tab 2
     Set dictLookup = CreateObject("Scripting.Dictionary")
     lastRow2 = ws2.Cells(ws2.Rows.Count, 1).End(xlUp).Row
+    Dim colRegID As Long: colRegID = ws2.Rows(1).Find("RegulatedGameID").Column
     For r = 2 To lastRow2
-        dictLookup(Trim(ws2.Cells(r, ws2.Rows(1).Find("RegulatedGameID").Column).Value)) = r
+        dictLookup(Trim(ws2.Cells(r, colRegID).Value)) = r
     Next
     
     ' Loop through each CRQ
     Dim key As Variant
     For Each key In dictCRQ.Keys
         crq = key
-        outRow = 3
-        ws4.Rows("3:" & ws4.Rows.Count).ClearContents
+        
+        ' Find next available row in Tab 4 (start at row 3 if empty)
+        outRow = ws4.Cells(ws4.Rows.Count, 1).End(xlUp).Row + 1
+        If outRow < 3 Then outRow = 3
         
         ' Collect Reg Game IDs for this CRQ
         For r = 2 To lastRow1
@@ -49,26 +52,19 @@ Public Sub GenerateReports()
                     ws4.Cells(outRow, 8).Value = ws2.Cells(rr, ws2.Rows(1).Find("TheoreticalRTP").Column).Value
                     ws4.Cells(outRow, 9).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("isProgrssive").Column).Value)) = "true", "Y", "N")
                     ws4.Cells(outRow, 10).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("GameType").Column).Value)) = "slots", "Y", "N")
+                    ws4.Cells(outRow, 11).Value = Format(NextBusinessDay(Date), "dd/mm/yyyy") ' Column K
                     outRow = outRow + 1
                 End If
             End If
         Next
         
-        ' Date in Column K
-        If outRow > 3 Then
-            d = Date + 1
-            If Weekday(d, vbMonday) = 6 Then d = d + 2
-            ws4.Range("K3:K" & outRow - 1).Value = Format(d, "dd/mm/yyyy")
-        End If
-        
-        ' Format Tab 4
-        With ws4.UsedRange
+        ' Format Tab 4 cells we just wrote
+        With ws4.Range("A3:K" & outRow - 1)
             .Font.Color = vbBlack
             .Borders.LineStyle = xlContinuous
         End With
         
-        ' Tab 3 setup
-        ws3.Cells.ClearContents
+        ' Tab 3 setup (only target cells, template preserved)
         Dim uniqNames As Object: Set uniqNames = CreateObject("Scripting.Dictionary")
         lastRow4 = ws4.Cells(ws4.Rows.Count, 2).End(xlUp).Row
         For r = 3 To lastRow4
@@ -93,7 +89,7 @@ Public Sub GenerateReports()
         Next
         ws3.Range("A28").Value = "See Games Installation Form " & crq
         ws3.Range("A34").Value = "See Games Installation Form " & crq
-        ws3.UsedRange.Font.Color = vbBlack
+        ws3.Range("A1:A34").Font.Color = vbBlack
         
         ' Export Tab 4
         ExportSheet ws4, "Game Installation Form " & crq
@@ -101,6 +97,12 @@ Public Sub GenerateReports()
         ExportSheet ws3, ws3.Range("A1").Value
     Next
 End Sub
+
+Private Function NextBusinessDay(d As Date) As Date
+    Dim nd As Date: nd = d + 1
+    If Weekday(nd, vbMonday) = 6 Then nd = nd + 2 ' Saturday → Monday
+    NextBusinessDay = nd
+End Function
 
 Private Sub ExportSheet(ws As Worksheet, baseName As String)
     Dim fn As String
