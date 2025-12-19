@@ -1,6 +1,10 @@
 Option Explicit
 
 Public Sub GenerateReports()
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet, ws4 As Worksheet
     Dim dictCRQ As Object, dictLookup As Object
     Dim lastRow1 As Long, lastRow2 As Long, r As Long, crq As Variant
@@ -47,7 +51,7 @@ Public Sub GenerateReports()
                     ws4.Cells(outRow, 1).Value = crq
                     ws4.Cells(outRow, 2).Value = ws2.Cells(rr, ws2.Rows(1).Find("GameName").Column).Value
                     ws4.Cells(outRow, 3).Value = ws2.Cells(rr, ws2.Rows(1).Find("GamesCertificateReference").Column).Value
-                    ws4.Cells(outRow, 4).Value = ws2.Cells(rr, ws2.Rows(1).Find("PlatformOwner").Column).Value
+                    ws4.Cells(outRow, 4).Value = ws2.Cells(rr, ws2.Rows(1).Find("provider").Column).Value
                     ws4.Cells(outRow, 6).Value = ws2.Cells(rr, ws2.Rows(1).Find("Delivery Channel").Column).Value
                     ws4.Cells(outRow, 7).Value = ws2.Cells(rr, ws2.Rows(1).Find("GameVersion").Column).Value
                     ws4.Cells(outRow, 8).Value = ws2.Cells(rr, ws2.Rows(1).Find("TheoreticalRTP").Column).Value
@@ -66,11 +70,13 @@ Public Sub GenerateReports()
             If Len(Trim(ws4.Cells(r, 2).Value)) > 0 Then uniqNames(Trim(ws4.Cells(r, 2).Value)) = 1
         Next
         
-        Dim platformOwner As String: platformOwner = ws4.Cells(3, 4).Value
+        Dim provider As String: provider = ws4.Cells(3, 4).Value
         If uniqNames.Count = 1 Then
-            ws3.Range("A1").Value = "Activate " & platformOwner & " game " & ws4.Cells(3, 2).Value & " on Desktop & Mobile (" & crq & ")"
+            ws3.Range("A1").Value = "Activate " & provider & " game " & ws4.Cells(3, 2).Value & " on Desktop & Mobile (" & crq & ")"
+            ws3.Range("A4").Value = "Activate " & provider & " game " & ws4.Cells(3, 2).Value & " on Desktop & Mobile" & vbCrLf & "New Content"
         ElseIf uniqNames.Count > 1 Then
-            ws3.Range("A1").Value = "Activate multiple " & platformOwner & " games on Desktop & Mobile (" & crq & ")"
+            ws3.Range("A1").Value = "Activate multiple " & provider & " games on Desktop & Mobile (" & crq & ")"
+            ws3.Range("A4").Value = "Activate multiple " & provider & " games on Desktop & Mobile" & vbCrLf & "New Content"
         End If
         ws3.Range("A4").Value = ws3.Range("A1").Value & vbCrLf & "New Content"
         ws3.Range("A16").Value = Format(CDate(ws4.Range("K3").Value), "MMMM dd, yyyy") & " - 1 Hour"
@@ -85,6 +91,11 @@ Public Sub GenerateReports()
         ws3.Range("A34").Value = "See Games Installation Form " & crq
         
         ' --- Export ---
+        With ws4.UsedRange
+            .Borders.LineStyle = xlContinuous
+        End With
+        lastRow4_2 = ws4.Cells(ws4.Rows.Count, 1).End(xlUp).Row
+        If lastRow4_2 >= 3 Then ws4.Range("E3:E" & lastRow4_2).Value = "Casino"
         ExportSheet ws4, "Game Installation Form " & crq
         ExportSheet ws3, ws3.Range("A1").Value
         
@@ -92,6 +103,12 @@ Public Sub GenerateReports()
         ws3.UsedRange.Value = tpl3
         ws4.UsedRange.Value = tpl4
     Next
+
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.Calculation = xlCalculationAutomatic
+
+    MsgBox "All CRQ reports have been created successfully.", vbInformation
 End Sub
 
 Private Function NextBusinessDay(d As Date) As Date
