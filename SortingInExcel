@@ -93,7 +93,8 @@ Public Sub GenerateReports()
         With ws4.UsedRange
             .Borders.LineStyle = xlContinuous
         End With
-        Dim lastRow4_2 = ws4.Cells(ws4.Rows.Count, 1).End(xlUp).Row
+        Dim lastRow4_2 As Long
+        lastRow4_2 = ws4.Cells(ws4.Rows.Count, 1).End(xlUp).Row
         If lastRow4_2 >= 3 Then ws4.Range("E3:E" & lastRow4_2).Value = "Casino"
         ExportSheet ws4, "Game Installation Form " & crq
         ws3.UsedRange.Font.Color = vbBlack
