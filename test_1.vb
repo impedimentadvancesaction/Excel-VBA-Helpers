@@ -95,22 +95,12 @@ End Function
 
 Private Sub GetStateLists(ByRef stateNames As Variant, ByRef stateCodes As Variant)
 	' 50 states only (no DC / territories).
-	stateNames = Array(
-		"Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", _
-		"Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", _
-		"Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", _
-		"New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", _
-		"South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming" _
-	)
+	' NOTE: VBA is picky about line continuations in Array(...) calls.
+	' Keeping these on a single physical line avoids "Syntax error" / "Expected: )" issues.
+	stateNames = Array("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
 
 	' Codes per your format: "US" + postal abbreviation.
-	stateCodes = Array(
-		"USAL", "USAK", "USAZ", "USAR", "USCA", "USCO", "USCT", "USDE", "USFL", "USGA", _
-		"USHI", "USID", "USIL", "USIN", "USIA", "USKS", "USKY", "USLA", "USME", "USMD", _
-		"USMA", "USMI", "USMN", "USMS", "USMO", "USMT", "USNE", "USNV", "USNH", "USNJ", _
-		"USNM", "USNY", "USNC", "USND", "USOH", "USOK", "USOR", "USPA", "USRI", "USSC", _
-		"USSD", "USTN", "USTX", "USUT", "USVT", "USVA", "USWA", "USWV", "USWI", "USWY" _
-	)
+	stateCodes = Array("USAL", "USAK", "USAZ", "USAR", "USCA", "USCO", "USCT", "USDE", "USFL", "USGA", "USHI", "USID", "USIL", "USIN", "USIA", "USKS", "USKY", "USLA", "USME", "USMD", "USMA", "USMI", "USMN", "USMS", "USMO", "USMT", "USNE", "USNV", "USNH", "USNJ", "USNM", "USNY", "USNC", "USND", "USOH", "USOK", "USOR", "USPA", "USRI", "USSC", "USSD", "USTN", "USTX", "USUT", "USVT", "USVA", "USWA", "USWV", "USWI", "USWY")
 End Sub
 
 Private Function GetStateAffectingColumns(ByVal ws As Worksheet, ByVal stateNames As Variant) As Long()
