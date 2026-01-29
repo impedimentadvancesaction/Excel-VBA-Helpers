@@ -104,7 +104,7 @@ Private Function NormalizeForWordSplit(ByVal s As String) As String
 
 	' Punctuation to spaces
 	Dim punct As Variant
-	punct = Array(".", ",", ";", ":", "!", "?", "(", ")", "[", "]", "{", "}", "\"", "'", "“", "”", "‘", "’", "-", "–", "—", "/", "\\", "|", "_", "=", "+", "*", "&", "^", "%", "#", "@", "~", "`")
+	punct = Array(".", ",", ";", ":", "!", "?", "(", ")", "[", "]", "{", "}", """""", "'", "“", "”", "‘", "’", "-", "–", "—", "/", "\", "|", "_", "=", "+", "*", "&", "^", "%", "#", "@", "~", "`")
 
 	Dim i As Long
 	For i = LBound(punct) To UBound(punct)
