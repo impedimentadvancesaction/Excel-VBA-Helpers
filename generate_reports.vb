@@ -200,11 +200,18 @@ Private Sub ApplyLookupReplacements_ColumnJ(ByVal wsData As Worksheet, ByVal fir
 	If lookupDict Is Nothing Then Exit Sub
 	If lastRow < firstRow Then Exit Sub
 
+	' Build a single regex that finds any lookup key as a whole token inside a longer string.
+	' Token boundary definition: non-alphanumeric (or start/end of string).
+	Dim alternation As String
+	alternation = BuildAlternationFromLookupKeys(lookupDict)
+	If Len(alternation) = 0 Then Exit Sub
+
 	' Late-bound regex to avoid requiring a reference
 	Dim re As Object
 	Set re = CreateObject("VBScript.RegExp")
-	re.Global = False
+	re.Global = True
 	re.IgnoreCase = True
+	re.Pattern = "(^|[^A-Za-z0-9])(" & alternation & ")($|[^A-Za-z0-9])"
 
 	Dim r As Long
 	For r = firstRow To lastRow
@@ -214,12 +221,31 @@ Private Sub ApplyLookupReplacements_ColumnJ(ByVal wsData As Worksheet, ByVal fir
 			Dim s As String
 			s = SanitizeText(CStr(cellValue))
 			If Len(s) > 0 Then
-				If lookupDict.Exists(s) Then
-					' Full match only (anchored)
-					re.Pattern = "^" & EscapeRegex(s) & "$"
-					If re.Test(s) Then
-						wsData.Cells(r, colJ).Value2 = CStr(lookupDict(s))
-					End If
+				Dim matches As Object
+				Set matches = re.Execute(s)
+				If matches.Count > 0 Then
+					Dim i As Long
+					For i = matches.Count - 1 To 0 Step -1
+						Dim m As Object
+						Set m = matches.Item(i)
+
+						Dim boundaryLeft As String
+						Dim token As String
+						Dim boundaryRight As String
+						boundaryLeft = CStr(m.SubMatches(0))
+						token = CStr(m.SubMatches(1))
+						boundaryRight = CStr(m.SubMatches(2))
+
+						If lookupDict.Exists(token) Then
+							Dim replacementText As String
+							replacementText = boundaryLeft & CStr(lookupDict(token)) & boundaryRight
+
+							Dim startPos As Long
+							startPos = CLng(m.FirstIndex) ' 0-based
+							s = Left$(s, startPos) & replacementText & Mid$(s, startPos + CLng(m.Length) + 1)
+						End If
+					Next i
+					wsData.Cells(r, colJ).Value2 = s
 				End If
 			Else
 				' Keep truly blank cells blank (don’t write back whitespace)
@@ -228,6 +254,30 @@ Private Sub ApplyLookupReplacements_ColumnJ(ByVal wsData As Worksheet, ByVal fir
 		End If
 	Next r
 End Sub
+
+Private Function BuildAlternationFromLookupKeys(ByVal lookupDict As Object) As String
+	If lookupDict Is Nothing Then
+		BuildAlternationFromLookupKeys = vbNullString
+		Exit Function
+	End If
+	If lookupDict.Count = 0 Then
+		BuildAlternationFromLookupKeys = vbNullString
+		Exit Function
+	End If
+
+	Dim parts() As String
+	ReDim parts(0 To lookupDict.Count - 1)
+
+	Dim idx As Long
+	idx = 0
+	Dim k As Variant
+	For Each k In lookupDict.Keys
+		parts(idx) = EscapeRegex(CStr(k))
+		idx = idx + 1
+	Next k
+
+	BuildAlternationFromLookupKeys = Join(parts, "|")
+End Function
 
 Private Function EscapeRegex(ByVal s As String) As String
 	' Escapes regex metacharacters for VBScript.RegExp
