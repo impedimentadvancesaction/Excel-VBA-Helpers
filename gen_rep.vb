@@ -12,9 +12,9 @@ Public Sub GenerateReports()
     
     Set ws1 = Worksheets("Working Sheet")
     Set ws2 = Worksheets("GCA Export")
-    Set ws3 = Worksheets("R9-RFM-CRQ-New-Jersey-Regulator")
+    Set ws3 = Worksheets("R9-REM-CRQ-New-Jersey-Regulator")
     Set ws4 = Worksheets("Game Configurations-Activations")
-    Set ws5 = Worksheets("Tracking")  ' UPDATE THIS TO YOUR ACTUAL TRACKING SHEET NAME
+    Set ws5 = Worksheets("3rd Party Tracker")  ' UPDATE THIS TO YOUR ACTUAL TRACKING SHEET NAME
     
     ' Snapshot templates
     ws3.Copy after:=ws4
@@ -239,3 +239,4 @@ Private Function ParseDDMMYYYY(dateValue As Variant) As Date
         ParseDDMMYYYY = CDate(dateStr)
     End If
 End Function
+
