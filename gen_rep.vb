@@ -60,6 +60,7 @@ Public Sub GenerateReports()
         End If
         
         ws4.Columns(7).NumberFormat = "0"
+        ws4.Columns(11).NumberFormat = "dd/mm/yyyy"  ' Force UK date display for column K
         
         ' --- Populate Tab 4 ---
         Dim outRow As Long: outRow = 3
@@ -78,7 +79,7 @@ Public Sub GenerateReports()
                     ws4.Cells(outRow, 8).Value = ws2.Cells(rr, ws2.Rows(1).Find("TheoreticalRTP").Column).Value
                     ws4.Cells(outRow, 9).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("isProgressive").Column).Value)) = "true", "Y", "N")
                     ws4.Cells(outRow, 10).Value = IIf(LCase(Trim(ws2.Cells(rr, ws2.Rows(1).Find("GameType").Column).Value)) = "slots", "Y", "N")
-                    ws4.Cells(outRow, 11).Value = Format(NextBusinessDay(ParseDDMMYYYY(ws1.Cells(rr, ws1.Rows(1).Find("dd/mm/yyyy").Column).Value)), "dd/mm/yyyy")
+                    ws4.Cells(outRow, 11).Value = NextBusinessDay(Date) ' store as Date; display controlled by NumberFormat
                     outRow = outRow + 1
                 End If
             End If
@@ -98,7 +99,7 @@ Public Sub GenerateReports()
             ws3.Range("A1").Value = "IG-ND-13(HR) Activate multiple " & providerND13 & " games on Desktop & Mobile (" & crq & ")" & vbCrLf & "New Content"
             ws3.Range("A4").Value = "Activate multiple " & providerND13 & " games on Desktop & Mobile " & vbCrLf & "New Content"
         End If
-        ws3.Range("A16").Value = Format(ParseDDMMYYYY(ws4.Range("K3").Value), "MMMM dd, yyyy") & " – 1 Hour"
+        ws3.Range("A16").Value = Format(ParseDDMMYYYY(ws4.Range("K3").Value), "dd mmmm yyyy") & " – 1 Hour"
         
         For r = 2 To lastRow1
             If ws1.Cells(r, 3).Value = crq Then
@@ -131,7 +132,7 @@ Public Sub GenerateReports()
         Dim nextRow5 As Long
         Dim ndFilename As String
         Dim jiraValue As String
-        Dim gifDate As String
+        Dim gifDate As Date
         Dim colJira As Long
         
         ' Find next available row in ws5
@@ -149,13 +150,14 @@ Public Sub GenerateReports()
             End If
         Next
         
-        ' Get GIF date
-        gifDate = ws4.Range("K3").Value
+        ' Get GIF date (next business day from today)
+        gifDate = NextBusinessDay(Date)
         
         ' Write to ws5
         ws5.Cells(nextRow5, 1).Value = crq                      ' Column A: CRQ
-        ws5.Cells(nextRow5, 2).Value = ndFilename               ' Column B: ND filename
+        ws5.Cells(nextRow5, 3).Value = ndFilename               ' Column B: ND filename
         ws5.Cells(nextRow5, 8).Value = jiraValue                ' Column H: JIRA value
+        ws5.Cells(nextRow5, 11).NumberFormat = "dd/mm/yyyy"     ' Force UK date display for column K
         ws5.Cells(nextRow5, 11).Value = gifDate                 ' Column K: GIF date
         ws5.Cells(nextRow5, 12).Value = Date                    ' Column L: Today's date
         ws5.Cells(nextRow5, 14).Value = "Game Activation"       ' Column N: "Game Activation"
@@ -210,16 +212,30 @@ Private Function SanitizeFileName(s As String) As String
     SanitizeFileName = Trim(s)
 End Function
 
-Private Function ParseDDMMYYYY(dateStr As String) As Date
-    ' Explicitly parse DD/MM/YYYY format dates
+Private Function ParseDDMMYYYY(dateValue As Variant) As Date
+    ' Accept either a true Date (preferred) or a DD/MM/YYYY string.
+    If IsDate(dateValue) Then
+        ParseDDMMYYYY = CDate(dateValue)
+        Exit Function
+    End If
+
+    Dim dateStr As String
+    dateStr = Trim$(CStr(dateValue))
+
     Dim parts() As String
-    parts = Split(dateStr, "/")
-    
+    If InStr(1, dateStr, "/") > 0 Then
+        parts = Split(dateStr, "/")
+    ElseIf InStr(1, dateStr, "-") > 0 Then
+        parts = Split(dateStr, "-")
+    Else
+        ParseDDMMYYYY = CDate(dateStr)
+        Exit Function
+    End If
+
     If UBound(parts) = 2 Then
-        ' DateSerial expects (Year, Month, Day)
+        ' Assume DD/MM/YYYY
         ParseDDMMYYYY = DateSerial(CInt(parts(2)), CInt(parts(1)), CInt(parts(0)))
     Else
-        ' Fallback if format is unexpected
         ParseDDMMYYYY = CDate(dateStr)
     End If
 End Function
