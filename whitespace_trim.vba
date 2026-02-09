@@ -22,8 +22,12 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         'Trim leading/trailing spaces
         v = Trim(v)
 
+        'Prevent recursion
+        Application.EnableEvents = False
         Target.Value = v
+        Application.EnableEvents = True
     End If
 
 ExitPoint:
+    Application.EnableEvents = True
 End Sub
