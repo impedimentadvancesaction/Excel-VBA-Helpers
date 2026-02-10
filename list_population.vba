@@ -12,16 +12,19 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 
         ' This list contains the values in A2 that should trigger
         ' a dropdown list in cell A8.
+        ' IMPORTANT: These values are cleaned before comparison so that
+        ' hidden characters (fake hyphens, non-breaking spaces, etc.)
+        ' do not prevent a match.
         Dim specialList As Variant
-        specialList = Array("Value1", "Value2", "Value3")  ' <-- Replace with real trigger values
+        specialList = Array("IG-ND-21", "Value2", "Value3")  ' <-- Replace with your real trigger values
 
         Dim trigger As Boolean
         Dim v As Variant
 
         ' Check whether the value entered into A2 matches
-        ' any value in the trigger list (ignoring upper/lower case).
+        ' any value in the trigger list (ignoring case and hidden characters).
         For Each v In specialList
-            If StrComp(Target.Value, v, vbTextCompare) = 0 Then
+            If StrComp(CleanText(Target.Value), CleanText(v), vbTextCompare) = 0 Then
                 trigger = True
                 Exit For
             End If
@@ -85,3 +88,29 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     End If
 
 End Sub
+
+
+' =========================================================
+' CLEANING FUNCTION TO FIX UNICODE / HYPHEN ISSUES
+' =========================================================
+Private Function CleanText(txt As String) As String
+    ' This function removes or replaces hidden characters that can cause
+    ' text comparisons to fail even when the text looks identical in Excel.
+
+    Dim t As String
+    t = txt
+
+    ' Replace common Unicode dash characters with a normal hyphen
+    t = Replace(t, ChrW(8211), "-")   ' en dash
+    t = Replace(t, ChrW(8212), "-")   ' em dash
+    t = Replace(t, ChrW(8209), "-")   ' non-breaking hyphen
+    t = Replace(t, ChrW(173), "-")    ' soft hyphen
+
+    ' Replace non-breaking spaces with normal spaces
+    t = Replace(t, Chr(160), " ")
+
+    ' Trim leading/trailing spaces
+    t = Trim(t)
+
+    CleanText = t
+End Function
