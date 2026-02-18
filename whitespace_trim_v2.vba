@@ -77,7 +77,9 @@ End Sub
 Private Function CleanCellValue(ByVal v As Variant) As Variant
 
     Dim lines() As String
+    Dim kept() As String
     Dim i As Long
+    Dim k As Long
 
     ' Exit immediately if the value is not text
     If VarType(v) <> vbString Then
@@ -108,9 +110,24 @@ Private Function CleanCellValue(ByVal v As Variant) As Variant
             lines(i) = Replace(lines(i), "  ", " ")
         Loop
 
+        ' Remove empty lines (including those that were only whitespace)
+        If Len(lines(i)) > 0 Then
+            If k = 0 Then
+                ReDim kept(0 To 0)
+            Else
+                ReDim Preserve kept(0 To k)
+            End If
+            kept(k) = lines(i)
+            k = k + 1
+        End If
+
     Next i
 
     ' Reassemble the original multi-line structure
-    CleanCellValue = Join(lines, vbLf)
+    If k = 0 Then
+        CleanCellValue = vbNullString
+    Else
+        CleanCellValue = Join(kept, vbLf)
+    End If
 
 End Function
